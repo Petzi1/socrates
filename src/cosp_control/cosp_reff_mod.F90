@@ -140,21 +140,24 @@ END DO
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 END SUBROUTINE cosp_reff
 
-subroutine gammafunc(y,gam)
+subroutine gammafunc(y_in,gam_out)
 use yomhook, only: lhook, dr_hook
 use parkind1, only: jprb, jpim
 implicit none
-real(wp) ::                                                      &
+real ::                                                      &
                             !, intent(in)
-  y
-real(wp) ::                                                      &
+  y_in
+real ::                                                      &
                             !, intent(out)
-  gam
+  gam_out
 ! Gamma function of Y
 
 ! LOCAL VARIABLE
 integer :: i,m
 real(wp) :: gg,g,pare,x
+
+real(wp) :: y
+real(wp) :: gam
 
 integer(kind=jpim), parameter :: zhook_in  = 0
 integer(kind=jpim), parameter :: zhook_out = 1
@@ -164,6 +167,8 @@ character(len=*), parameter :: RoutineName='GAMMAF'
 
 ! --------------------------------------------------------------------
 if (lhook) call dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+y=y_in
 gg=1.0
 m=floor(y)
 x=y-m
@@ -181,6 +186,7 @@ end if
 pare=-0.5748646*x+0.9512363*x*x-0.6998588*x*x*x                                &
 +0.4245549*x*x*x*x-0.1010678*x*x*x*x*x+1.0
 gam=pare*gg
+gam_out=gam
 if (lhook) call dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 return
 end subroutine gammafunc

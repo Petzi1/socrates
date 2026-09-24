@@ -11,6 +11,7 @@
 module cosp_mod
 
 use mod_cosp_config, only: n_backscatter_bins => sr_bins, &
+                           n_dbze_bins => cloudsat_dbze_bins, &
                            n_isccp_tau_bins => numisccptaubins, &
                            n_isccp_pressure_bins => numisccppresbins, &
                            vgrid_zl, vgrid_zu
@@ -1196,9 +1197,10 @@ subroutine cosp( nlevels, &
   if (associated(cosp_diag%cosp_calipso_gbxmean_atb_40)) then 
 
     call cosp_gridbox_mean(npoints,ncolumns,nlevels, &
-      cosp_column_in%hgt_matrix(:,nlevels:1:-1), &
-      cosp_column_in%hgt_matrix_half(:,nlevels:1:-1), & 
-      .true., calipso_beta_tot_40(:,:,cosp_nlr:1:-1), &
+      cosp_column_in%surfelev, &
+      vgrid_zu(cosp_nlr:1:-1), &
+      .true., &
+      calipso_beta_tot_40(:,:,cosp_nlr:1:-1), &
       calipso_gbxmean_atb_40(:,cosp_nlr:1:-1))
 
     if (l_last) then

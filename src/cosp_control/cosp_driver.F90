@@ -20,6 +20,7 @@ use mod_cosp, only: cosp_outputs
 use cosp_mod, only: &
     cosp, &
     n_backscatter_bins, &
+    n_dbze_bins, &
     n_isccp_tau_bins, &
     n_isccp_pressure_bins, &
     n_cloudsat_levels
@@ -245,7 +246,7 @@ do l=1, n_profile_list
 end do ! n_profile_list
 
 
-ncolumns = 4
+ncolumns = 1
 
 if (l_profile_last) then
   allocate(p_full_levels(nlevels,n_profile_full))
@@ -398,17 +399,7 @@ deallocate(ph)
 d_mass=1.0_RealExt
 frac_cloud_water=1.0_RealExt
 frac_cloud_ice=1.0_RealExt
-if (l_profile_last) then
-  clw_sub_full(:,1,:)=0.1_RealExt
-  clw_sub_full(:,2,:)=0.5_RealExt
-  clw_sub_full(:,3,:)=0.9_RealExt
-  clw_sub_full(:,4,:)=1.0_RealExt
-else
-  clw_sub_full(:,:,1)=0.1_RealExt
-  clw_sub_full(:,:,2)=0.5_RealExt
-  clw_sub_full(:,:,3)=0.9_RealExt
-  clw_sub_full(:,:,4)=1.0_RealExt
-end if
+clw_sub_full=0.1_RealExt
 
 ! For rain taken from [namelist:run_precip]
 x1r = 2.2000e-1
@@ -780,40 +771,36 @@ do l=1,n_profile_full
     write(lun,*) 'profile: ',l
 
     ! 2330
-    write(*,*) 'profile: ',l
-    write(*,*) 'cloud_weights (2330)'
-    write(*,*) cosp_diag%cosp_cloud_weights(l)
+    write(lun,*) 'cloud_weights (2330)'
+    write(lun,*) cosp_diag%cosp_cloud_weights(l)
 
     ! 2337
-    write(*,*) 'profile: ',l
-    write(*,*) 'ctp_tau_histogram (2337)'
+    write(lun,*) 'ctp_tau_histogram (2337)'
     if (l_profile_last) then
       do i=1, n_isccp_pressure_bins
-        write(*,'(10f5.1)') cosp_diag%cosp_ctp_tau_histogram(1:n_isccp_tau_bins, i, l)
+        write(lun,'(10f5.1)') cosp_diag%cosp_ctp_tau_histogram(1:n_isccp_tau_bins, i, l)
       end do
     else
       do i=1, n_isccp_pressure_bins
-        write(*,'(10f5.1)') cosp_diag%cosp_ctp_tau_histogram(l, 1:n_isccp_tau_bins, i)
+        write(lun,'(10f5.1)') cosp_diag%cosp_ctp_tau_histogram(l, 1:n_isccp_tau_bins, i)
       end do
     end if ! l_profile_last
 
     ! 2341
-    write(*,*) 'profile: ',l
-    write(*,*) 'calipso_tot_backscatter (2341)'
+    write(lun,*) 'calipso_tot_backscatter (2341)'
     if (l_profile_last) then
       do i=1, nlevels
-        write(*,'(i4,1000e16.6)') i, cosp_diag%cosp_calipso_tot_backscatter(i, 1:ncolumns, l)
+        write(lun,'(i4,1000e16.6)') i, cosp_diag%cosp_calipso_tot_backscatter(i, 1:ncolumns, l)
       end do
     else
       do i=1, nlevels
-        write(*,'(i4,1000e16.6)') i, cosp_diag%cosp_calipso_tot_backscatter(l, i, 1:ncolumns)
+        write(lun,'(i4,1000e16.6)') i, cosp_diag%cosp_calipso_tot_backscatter(l, i, 1:ncolumns)
       end do
     end if ! l_profile_last
 
     ! 2321-2323 and 2344-2346
-    write(*,*) 'profile: ',l
-    write(*,*) 'low/mid/high-level cloud mask/value (2321-2323, 2344-2346)'
-    write(*,'(10f5.1)') cosp_diag%cosp_calipso_low_level_cl_mask(l),  &
+    write(lun,*) 'low/mid/high-level cloud mask/value (2321-2323, 2344-2346)'
+    write(lun,'(10f5.1)') cosp_diag%cosp_calipso_low_level_cl_mask(l),  &
                         cosp_diag%cosp_calipso_low_level_cl(l),       &
                         cosp_diag%cosp_calipso_mid_level_cl_mask(l),  &
                         cosp_diag%cosp_calipso_mid_level_cl(l),       &
@@ -821,12 +808,11 @@ do l=1,n_profile_full
                         cosp_diag%cosp_calipso_high_level_cl(l)
 
     ! 2325, 2473-2475 and 2370
-    write(*,*) 'profile: ',l
-    write(*,*) 'on 40 levels: '
-    write(*,*) 'cf mask/liq/ice/undet and cfad_sr_backscatter_bins (2325, 2473-2475 and 2370)'
+    write(lun,*) 'on 40 levels: '
+    write(lun,*) 'cf mask/liq/ice/undet and cfad_sr_backscatter_bins (2325, 2473-2475 and 2370)'
     if (l_profile_last) then
       do i=1,n_cloudsat_levels
-        write(*,'(i4,100f5.1)') i,cosp_diag%cosp_calipso_cf_40_mask(i,l), &
+        write(lun,'(i4,100f5.1)') i,cosp_diag%cosp_calipso_cf_40_mask(i,l), &
                                   cosp_diag%cosp_calipso_cf_40_liq(i,l), &
                                   cosp_diag%cosp_calipso_cf_40_ice(i,l), &
                                   cosp_diag%cosp_calipso_cf_40_undet(i,l), &
@@ -834,7 +820,7 @@ do l=1,n_profile_full
       end do
     else
       do i=1,n_cloudsat_levels
-        write(*,'(i4,100f5.1)') i,cosp_diag%cosp_calipso_cf_40_mask(l,i), &
+        write(lun,'(i4,100f5.1)') i,cosp_diag%cosp_calipso_cf_40_mask(l,i), &
                                   cosp_diag%cosp_calipso_cf_40_liq(l,i), &
                                   cosp_diag%cosp_calipso_cf_40_ice(l,i), &
                                   cosp_diag%cosp_calipso_cf_40_undet(l,i), &
@@ -843,147 +829,134 @@ do l=1,n_profile_full
     end if ! l_profile_last
 
     ! 2331
-    write(*,*) 'profile: ',l
-    write(*,*) 'weighted cloud_albedo (2331)'
-    write(*,*) cosp_diag%cosp_weighted_cloud_albedo(l)
+    write(lun,*) 'weighted cloud_albedo (2331)'
+    write(lun,*) cosp_diag%cosp_weighted_cloud_albedo(l)
 
     ! 2333
-    write(*,*) 'profile: ',l
-    write(*,*) 'weighted ctp (2333)'
-    write(*,*) cosp_diag%cosp_weighted_ctp(l)
+    write(lun,*) 'weighted ctp (2333)'
+    write(lun,*) cosp_diag%cosp_weighted_ctp(l)
     
     ! 2334
-    write(*,*) 'profile: ',l
-    write(*,*) 'weighted total cloud area (2334)'
-    write(*,*) cosp_diag%cosp_tot_cloud_area(l)
+    write(lun,*) 'weighted total cloud area (2334)'
+    write(lun,*) cosp_diag%cosp_tot_cloud_area(l)
 
     ! 2340
-    write(*,*) 'profile: ',l
-    write(*,*) 'on model levels: calipso_mol_backscatter (2340)'
+    write(lun,*) 'on model levels: calipso_mol_backscatter (2340)'
     if (l_profile_last) then
       do i=1, nlevels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_mdl(i,l)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_mdl(i,l)
       end do
     else
       do i=1, nlevels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_mdl(l,i)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_mdl(l,i)
       end do
     end if ! l_profile_last
 
     ! 2353
-    write(*,*) 'profile: ',l
-    write(*,*) 'on model levels: gbx mean cloudsat ze (2353)'
+    write(lun,*) 'on model levels: gbx mean cloudsat ze (2353)'
     if (l_profile_last) then
       do i=1, nlevels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_mdl(i,l)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_mdl(i,l)
       end do
     else
       do i=1, nlevels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_mdl(l,i)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_mdl(l,i)
       end do
     end if ! l_profile_last
 
     ! 2354
-    write(*,*) 'profile: ',l
-    write(*,*) 'on 40 levels: gbx mean cloudsat ze (2354)'
+    write(lun,*) 'on 40 levels: gbx mean cloudsat ze (2354)'
     if (l_profile_last) then
       do i=1, n_cloudsat_levels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_40(i,l)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_40(i,l)
       end do
     else
       do i=1, n_cloudsat_levels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_40(l,i)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_cloudsat_gbxmean_ze_40(l,i)
       end do
     end if ! l_profile_last
 
     ! 2355
-    write(*,*) 'profile: ',l
-    write(*,*) 'on model levels: gbx mean calipso atb (2355)'
+    write(lun,*) 'on model levels: gbx mean calipso atb (2355)'
     if (l_profile_last) then
       do i=1, nlevels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_mdl(i,l)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_mdl(i,l)
       end do
     else
       do i=1, nlevels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_mdl(l,i)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_mdl(l,i)
       end do
     end if ! l_profile_last
 
     ! 2356
-    write(*,*) 'profile: ',l
-    write(*,*) 'on 40 levels: gbx mean calipso atb (2356)'
+    write(lun,*) 'on 40 levels: gbx mean calipso atb (2356)'
     if (l_profile_last) then
       do i=1, n_cloudsat_levels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_40(i,l)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_40(i,l)
       end do
     else
       do i=1, n_cloudsat_levels
-        write(*,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_40(l,i)
+        write(lun,'(i4,2e16.6)') i, cosp_diag%cosp_calipso_gbxmean_atb_40(l,i)
       end do
     end if ! l_profile_last
 
     ! 2357
-    write(*,*) 'profile: ',l
-    write(*,*) 'on 40 levels: calipso_mol_backscatter (2357)'
+    write(lun,*) 'on 40 levels: calipso_mol_backscatter (2357)'
     if (l_profile_last) then
       do i=1, n_cloudsat_levels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_40(i,l)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_40(i,l)
       end do
     else
       do i=1, n_cloudsat_levels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_40(l,i)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_mol_atb_40(l,i)
       end do
     end if ! l_profile_last
 
     ! 2358
-    write(*,*) 'profile: ',l
-    write(*,*) 'on model levels: calipso+cloudsat cloud (2358)'
+    write(lun,*) 'on model levels: calipso+cloudsat cloud (2358)'
     if (l_profile_last) then
       do i=1, nlevels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_mdl_cl(i,l)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_mdl_cl(i,l)
       end do
     else
       do i=1, nlevels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_mdl_cl(l,i)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_mdl_cl(l,i)
       end do
     end if ! l_profile_last
 
     ! 2359
-    write(*,*) 'profile: ',l
-    write(*,*) 'on 40 levels: calipso+cloudsat cloud (2359)'
+    write(lun,*) 'on 40 levels: calipso+cloudsat cloud (2359)'
     if (l_profile_last) then
       do i=1, n_cloudsat_levels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_40_cl(i,l)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_40_cl(i,l)
       end do
     else
       do i=1, n_cloudsat_levels
-        write(*,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_40_cl(l,i)
+        write(lun,'(i4,1e16.6)') i, cosp_diag%cosp_calipso_cloudsat_40_cl(l,i)
       end do
     end if ! l_profile_last
 
     ! 2371
-    write(*,*) 'profile: ',l
-    write(*,*) 'on 40 levels: calipso cloud area (2371)'
+    write(lun,*) 'on 40 levels: calipso cloud area (2371)'
     if (l_profile_last) then
       do i=1,n_cloudsat_levels
-        write(*,*) i,cosp_diag%cosp_calipso_cloud_area_40(i,l)
+        write(lun,*) i,cosp_diag%cosp_calipso_cloud_area_40(i,l)
       end do
     else
       do i=1,n_cloudsat_levels
-        write(*,*) i,cosp_diag%cosp_calipso_cloud_area_40(l,i)
+        write(lun,*) i,cosp_diag%cosp_calipso_cloud_area_40(l,i)
     end do
     end if ! l_profile_last
 
     ! 2372
-    write(*,*) 'profile: ',l
-    write(*,*) 'on 40 levels: cloudsat cfad ze (2372)'
+    write(lun,*) 'on 40 levels: cloudsat cfad ze (2372)'
     if (l_profile_last) then
       do i=1,n_cloudsat_levels
-        write(*,'(i4,100f5.1)') i,cosp_diag%cosp_cloudsat_cfad_ze_40(1:n_backscatter_bins, i, l)
+        write(lun,'(i4,100f5.1)') i,cosp_diag%cosp_cloudsat_cfad_ze_40(1:n_dbze_bins, i, l)
       end do
     else
       do i=1,n_cloudsat_levels
-        write(*,'(i4,100f5.1)') i,cosp_diag%cosp_cloudsat_cfad_ze_40(l, 1:n_backscatter_bins, i)
+        write(lun,'(i4,100f5.1)') i,cosp_diag%cosp_cloudsat_cfad_ze_40(l, 1:n_dbze_bins, i)
     end do
     end if ! l_profile_last
 

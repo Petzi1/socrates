@@ -63,6 +63,9 @@ real(RealExt), pointer :: cosp_calipso_cf_40_undet(:,:) => null()
 
 ! Secondary COSP diagnostics
 
+real(RealExt), pointer :: cosp_calipso_cloudsat_mdl_cl_mask(:,:) => null()
+! COSP: MASK FOR (CALIPSO/CLOUDSAT CLOUD MDL LEV (which was 2358)) (was 2326)
+
 real(RealExt), pointer :: cosp_calipso_cloudsat_40_cl_mask(:,:) => null()
 ! COSP: MASK FOR (CALIPSO/CLOUDSAT CLOUD 40 LEV (which was 2359)) (was 2327)
 
@@ -75,14 +78,26 @@ real(RealExt), pointer :: cosp_weighted_ctp(:) => null()
 real(RealExt), pointer :: cosp_tot_cloud_area(:) => null()
 ! COSP: ISCCP TOTAL CLOUD AREA (was 2334)
 
+real(RealExt), pointer :: cosp_calipso_mol_atb_mdl(:,:) => null()
+! COSP: CALIPSO MOLECULAR BACKSCATTER (was 2340)
+
+real(RealExt), pointer :: cosp_cloudsat_gbxmean_ze_mdl(:,:) => null()
+! COSP: GBX-MEAN CSAT Ze MDL LEVELS (was 2353)
+
 real(RealExt), pointer :: cosp_cloudsat_gbxmean_ze_40(:,:) => null()
 ! COSP: GBX-MEAN CSAT Ze 40 LEVELS (was 2354)
+
+real(RealExt), pointer :: cosp_calipso_gbxmean_atb_mdl(:,:) => null()
+! COSP: GBX-MEAN CALIPSO ATB MDL LVLS (was 2355)
 
 real(RealExt), pointer :: cosp_calipso_gbxmean_atb_40(:,:) => null()
 ! COSP: GBX-MEAN CALIPSO ATB 40 LVLS (was 2356)
 
 real(RealExt), pointer :: cosp_calipso_mol_atb_40(:,:) => null()
 ! COSP: CALIPSO MOLECULAR ATB 40 LVLS (was 2357)
+
+real(RealExt), pointer :: cosp_calipso_cloudsat_mdl_cl(:,:) => null()
+! COSP: CALIPSO/CLOUDSAT CLOUD 40 LEV (was 2358)
 
 real(RealExt), pointer :: cosp_calipso_cloudsat_40_cl(:,:) => null()
 ! COSP: CALIPSO/CLOUDSAT CLOUD 40 LEV (was 2359)

@@ -38,6 +38,7 @@ subroutine cosp( nlevels, &
         w_cloud, &
         condensed_mix_ratio_water, &
         condensed_mix_ratio_ice, &
+        cosp_lsrain, &
         cosp_crain, &
         cosp_csnow, &
         condensed_re_water, &
@@ -84,7 +85,7 @@ subroutine cosp( nlevels, &
   use cosp2_constants_mod, only: &
       cosp_qb_dist, cosp_hydroclass_init, &
       cosp_microphys_init, &
-      i_lscliq, i_lscice, &
+      i_lscliq, i_lscice, i_lsrain, &
       i_cvrain, i_cvsnow
   use cosp_radiation_mod, only: &
       cosp_radiative_properties
@@ -123,6 +124,7 @@ subroutine cosp( nlevels, &
   real(RealExt), intent(in), pointer :: w_cloud(:,:)
   real(RealExt), intent(in), pointer :: condensed_mix_ratio_water(:,:)
   real(RealExt), intent(in), pointer :: condensed_mix_ratio_ice(:,:)
+  real(RealExt), intent(in), pointer :: cosp_lsrain(:,:)
   real(RealExt), intent(in), pointer :: cosp_crain(:,:)
   real(RealExt), intent(in), pointer :: cosp_csnow(:,:)
   real(RealExt), intent(in), pointer :: condensed_re_water(:,:)
@@ -132,7 +134,9 @@ subroutine cosp( nlevels, &
   real(RealExt), intent(in), pointer :: frac_cloud_water(:,:)
   real(RealExt), intent(in), pointer :: frac_cloud_ice(:,:)
   real(RealExt), intent(in), pointer :: clw_sub_full(:,:,:)
-  real(RealExt), intent(in), pointer :: t_surf(:), p_surf(:), hgt_surf(:)
+  real(RealExt), intent(in), pointer :: t_surf(:)
+  real(RealExt), intent(in), pointer :: p_surf(:)
+  real(RealExt), intent(in), pointer :: hgt_surf(:)
   real(RealExt), intent(in), pointer :: cosp_sunlit(:)
 
   ! Microphysics
@@ -172,12 +176,15 @@ subroutine cosp( nlevels, &
   real(wp) :: cosp_temp1
   real(wp) :: cosp_temp2
   
-  real(wp) :: calipso_beta_mol_40(npoints,cosp_nlr)
-  real(wp) :: calipso_beta_tot_40(npoints,ncolumns,cosp_nlr)
-  real(wp) :: cloudsat_ze_tot_40(npoints,ncolumns,cosp_nlr)
-  real(wp) :: calipso_gbxmean_atb_40(npoints,cosp_nlr)
-  real(wp) :: cloudsat_gbxmean_ze_40(npoints,cosp_nlr)
-  real(wp) :: calipso_cloudsat_40_cl(npoints,cosp_nlr)
+  real(wp) :: calipso_beta_mol_40(npoints, cosp_nlr)
+  real(wp) :: calipso_beta_tot_40(npoints, ncolumns, cosp_nlr)
+  real(wp) :: cloudsat_ze_tot_40(npoints, ncolumns, cosp_nlr)
+  real(wp) :: calipso_gbxmean_atb_mdl(npoints, nlevels)
+  real(wp) :: calipso_gbxmean_atb_40(npoints, cosp_nlr)
+  real(wp) :: cloudsat_gbxmean_ze_mdl(npoints, nlevels)
+  real(wp) :: cloudsat_gbxmean_ze_40(npoints, cosp_nlr)
+  real(wp) :: calipso_cloudsat_mdl_cl(npoints, nlevels)
+  real(wp) :: calipso_cloudsat_40_cl(npoints, cosp_nlr)
 
   ! COSP configuration options
   type(radar_cfg) :: rcfg_cloudsat
@@ -222,6 +229,7 @@ subroutine cosp( nlevels, &
   cosp_cfg%lboxtauisccp    = .false.
   ! CALIPSO
   cosp_cfg%llidarbetamol532 = &
+    associated(cosp_diag%cosp_calipso_mol_atb_mdl) .or. & ! 2340
     associated(cosp_diag%cosp_calipso_mol_atb_40) ! 2357
   cosp_cfg%latb532          =  &
     associated(cosp_diag%cosp_calipso_tot_backscatter) ! 2341
@@ -303,7 +311,7 @@ subroutine cosp( nlevels, &
   cosp_cfg%lcfaddbze94  = &
     associated(cosp_diag%cosp_cloudsat_cfad_ze_40) ! 2372
   cosp_cfg%ldbze94      = &
-    associated(cosp_diag%cosp_cloudsat_gbxmean_ze_40)
+    associated(cosp_diag%cosp_cloudsat_gbxmean_ze_40) ! 2354
   cosp_cfg%ldbze94gbx   = &
     associated(cosp_diag%cosp_cloudsat_gbxmean_ze_40) ! 2354
   cosp_cfg%lcloudsat_tcc = .false.
@@ -312,8 +320,10 @@ subroutine cosp( nlevels, &
   cosp_cfg%lclcalipso2    = .false.
   cosp_cfg%lcltlidarradar = .false.
   cosp_cfg%lcllidarradar  = &
-    associated(cosp_diag%cosp_calipso_cloudsat_40_cl) .or. & ! 2359
-    associated(cosp_diag%cosp_calipso_cloudsat_40_cl_mask)   ! 2327
+   (associated(cosp_diag%cosp_calipso_cloudsat_mdl_cl) .or. &       ! 2358
+    associated(cosp_diag%cosp_calipso_cloudsat_mdl_cl_mask)) .or. & ! 2326
+   (associated(cosp_diag%cosp_calipso_cloudsat_40_cl) .or. &        ! 2359
+    associated(cosp_diag%cosp_calipso_cloudsat_40_cl_mask))         ! 2327
   ! RTTOV
   cosp_cfg%ltbrttov = .false.
   ! MISR
@@ -512,9 +522,9 @@ subroutine cosp( nlevels, &
     cosp_cfg%lcloudsat, cosp_cfg%lcalipso, cosp_cfg%lgrlidar532, &
     cosp_cfg%latlid, cosp_cfg%lparasol, cosp_cfg%lrttov, &
     cosp_radar_freq, cosp_k2, cosp_use_gas_abs, cosp_do_ray, &
-    cosp_isccp_topheight, cosp_isccp_topheight_direction, cosp_surface_radar, &
-    rcfg_cloudsat, cosp_use_vgrid, cosp_csat_vgrid, &
-    cosp_nlr, nlevels, cloudsat_micro_scheme)
+    cosp_isccp_topheight, cosp_isccp_topheight_direction, &
+    cosp_surface_radar, rcfg_cloudsat, cosp_use_vgrid, &
+    cosp_csat_vgrid, cosp_nlr, nlevels, cloudsat_micro_scheme)
 
   ! Allocate memory for COSP types
   call construct_cosp_inputs_host_model(npoints, ncolumns, &
@@ -556,6 +566,7 @@ subroutine cosp( nlevels, &
           cosp_column_in%hgt_matrix(l,i) = hgt_full_levels(ii,list(l))
           cosp_column_in%hgt_matrix_half(l,i+1) = hgt_half_levels(ii,list(l))
           cosp_column_in%at(l,i) = t_n(ii,list(l))
+          cosp_hmodel%mr_gbx(l,i,i_lsrain) = cosp_lsrain(ii,list(l))
           cosp_hmodel%mr_gbx(l,i,i_cvrain) = cosp_crain(ii,list(l))
           cosp_hmodel%mr_gbx(l,i,i_cvsnow) = cosp_csnow(ii,list(l))
         end do ! l
@@ -570,6 +581,7 @@ subroutine cosp( nlevels, &
           cosp_column_in%hgt_matrix(l,i) = hgt_full_levels(list(l),ii)
           cosp_column_in%hgt_matrix_half(l,i+1) = hgt_half_levels(list(l),ii)
           cosp_column_in%at(l,i) = t_n(list(l),ii)
+          cosp_hmodel%mr_gbx(l,i,i_lsrain) = cosp_lsrain(list(l),ii)
           cosp_hmodel%mr_gbx(l,i,i_cvrain) = cosp_crain(list(l),ii)
           cosp_hmodel%mr_gbx(l,i,i_cvsnow) = cosp_csnow(list(l),ii)
         end do ! l
@@ -726,68 +738,84 @@ subroutine cosp( nlevels, &
 
   ! COSP: MASK FOR CALIPSO LOW-LEVEL CF (was 2321)
   if (associated(cosp_diag%cosp_calipso_low_level_cl_mask)) then
+
     do l=1, npoints
       call create_mask(r_undef, cosp_out%calipso_cldlayer(l,1), &
       cosp_diag%cosp_calipso_low_level_cl_mask(list(l)))
     end do
-  end if
+
+  end if ! 2321
 
   ! COSP: CALIPSO LOW-LEVEL CLOUD (was 2344)
   if (associated(cosp_diag%cosp_calipso_low_level_cl)) then
+
     do l=1, npoints
       cosp_diag%cosp_calipso_low_level_cl(list(l)) &
-        = 0.01_RealExt * cosp_out%calipso_cldlayer(l,1)
+      = 0.01_RealExt * cosp_out%calipso_cldlayer(l,1)
     end do
-  end if
+
+  end if ! 2344
 
   ! COSP: MASK FOR CALIPSO MID-LEVEL CF (was 2322)
   if (associated(cosp_diag%cosp_calipso_mid_level_cl_mask)) then
+
     do l=1, npoints
       call create_mask(r_undef, cosp_out%calipso_cldlayer(l,2), &
       cosp_diag%cosp_calipso_mid_level_cl_mask(list(l)))
     end do
-  end if
+
+  end if ! 2322
 
   ! COSP: CALIPSO MID-LEVEL CLOUD (was 2345)
   if (associated(cosp_diag%cosp_calipso_mid_level_cl)) then
+
     do l=1, npoints
       cosp_diag%cosp_calipso_mid_level_cl(list(l)) &
-        = 0.01_RealExt * cosp_out%calipso_cldlayer(l,2)
+      = 0.01_RealExt * cosp_out%calipso_cldlayer(l,2)
     end do
-  end if
+
+  end if ! 232
 
   ! COSP: MASK FOR CALIPSO HIGH-LEVEL CF (was 2323)
   if (associated(cosp_diag%cosp_calipso_high_level_cl_mask)) then
+
     do l=1, npoints
       call create_mask(r_undef, cosp_out%calipso_cldlayer(l,3), &
       cosp_diag%cosp_calipso_high_level_cl_mask(list(l)))
     end do
-  end if
+
+  end if ! 2323
 
   ! COSP: CALIPSO HIGH-LEVEL CLOUD (was 2346)
   if (associated(cosp_diag%cosp_calipso_high_level_cl)) then
+
     do l=1, npoints
       cosp_diag%cosp_calipso_high_level_cl(list(l)) &
-        = 0.01_RealExt * cosp_out%calipso_cldlayer(l,3)
+      = 0.01_RealExt * cosp_out%calipso_cldlayer(l,3)
     end do
-  end if
+
+  end if ! 2346
 
   ! COSP: ISCCP CTP-TAU HISTOGRAM (was 2330)
   if (associated(cosp_diag%cosp_cloud_weights)) then
+
     do l=1, npoints
       cosp_diag%cosp_cloud_weights(list(l)) &
         = real(cosp_column_in%sunlit(l), RealExt)
     end do
-  end if
+
+  end if ! 2330
 
   ! COSP: ISCCP CTP-TAU HISTOGRAM (was 2337)
   if (associated(cosp_diag%cosp_ctp_tau_histogram)) then
+
     if (l_last) then
       do i=1, n_isccp_pressure_bins
         do j=1, n_isccp_tau_bins
           do l=1, npoints
             if (cosp_out%isccp_fq(l,j,i) == r_undef) then
-               cosp_diag%cosp_ctp_tau_histogram(j,i,list(l)) = 0.0_RealExt
+               cosp_diag%cosp_ctp_tau_histogram(j,i,list(l)) &
+               = 0.0_RealExt
             else
                cosp_diag%cosp_ctp_tau_histogram(j,i,list(l)) &
                = 0.01_RealExt * cosp_out%isccp_fq(l,j,i)
@@ -800,7 +828,8 @@ subroutine cosp( nlevels, &
         do j=1, n_isccp_tau_bins
           do l=1, npoints
             if (cosp_out%isccp_fq(l,j,i) == r_undef) then
-               cosp_diag%cosp_ctp_tau_histogram(list(l),j,i) = 0.0_RealExt
+               cosp_diag%cosp_ctp_tau_histogram(list(l),j,i) &
+               = 0.0_RealExt
             else
                cosp_diag%cosp_ctp_tau_histogram(list(l),j,i) &
                = 0.01_RealExt * cosp_out%isccp_fq(l,j,i)
@@ -809,16 +838,17 @@ subroutine cosp( nlevels, &
         end do
       end do
     end if
-  end if
+
+  end if ! 2337
 
   ! COSP: CALIPSO TOTAL BACKSCATTER (was 2341)
   if (associated(cosp_diag%cosp_calipso_tot_backscatter)) then
+
     if (l_last) then
       do i=1, nlevels
-        ii=nlevels-i+1
         do lll=1, ncolumns
           do l=1, npoints
-            cosp_diag%cosp_calipso_tot_backscatter(ii, lll, list(l)) &
+            cosp_diag%cosp_calipso_tot_backscatter(i, lll, list(l)) &
               = cosp_out%calipso_beta_tot(l, lll, i)
           end do
         end do
@@ -826,358 +856,535 @@ subroutine cosp( nlevels, &
       ! Fill uncalculated sub-columns with zeros
       do l=1, npoints
         do lll=ncolumns+1, ubound(cosp_diag%cosp_calipso_tot_backscatter, 2)
-          do ii=1, nlevels
-            cosp_diag%cosp_calipso_tot_backscatter(ii, lll, list(l)) &
+          do i=1, nlevels
+            cosp_diag%cosp_calipso_tot_backscatter(i, lll, list(l)) &
               = 0.0_RealExt
           end do
         end do
       end do
     else
       do i=1, nlevels
-        ii=nlevels-i+1
         do lll=1, ncolumns
           do l=1, npoints
-            cosp_diag%cosp_calipso_tot_backscatter(list(l), ii, lll) &
+            cosp_diag%cosp_calipso_tot_backscatter(list(l), i, lll) &
               = cosp_out%calipso_beta_tot(l, lll, i)
           end do
         end do
       end do
       do lll=ncolumns+1, ubound(cosp_diag%cosp_calipso_tot_backscatter, 3)
-        do ii=1, nlevels
+        do i=1, nlevels
           do l=1, npoints
-            cosp_diag%cosp_calipso_tot_backscatter(list(l), ii, lll) &
+            cosp_diag%cosp_calipso_tot_backscatter(list(l), i, lll) &
               = 0.0_RealExt
           end do
         end do
       end do
     end if
-  end if
 
+  end if ! 2341
 
-  if (cosp_use_vgrid) then ! Using standard 40 level vertical grid
+  ! COSP CALIPSO CFAD SR 40 CSAT LEVELS (was 2370)
+  if (associated(cosp_diag%cosp_calipso_cfad_sr_40)) then
 
-    ! COSP CALIPSO CFAD SR 40 CSAT LEVELS (was 2370)
-    if (associated(cosp_diag%cosp_calipso_cfad_sr_40)) then
-      if (l_last) then
-        do i=1, cosp_nlr
-          do j=1, n_backscatter_bins
-            do l=1, npoints
-              cosp_diag%cosp_calipso_cfad_sr_40(j, i, list(l)) &
-              = cosp_out%calipso_cfad_sr(l, j, i)
-            end do
+    if (l_last) then
+      do i=1, cosp_nlr
+        do j=1, n_backscatter_bins
+          do l=1, npoints
+            cosp_diag%cosp_calipso_cfad_sr_40(j, i, list(l)) &
+            = cosp_out%calipso_cfad_sr(l, j, i)
           end do
         end do
-      else
-        do i=1, cosp_nlr
-          do j=1, n_backscatter_bins
-            do l=1, npoints
-              cosp_diag%cosp_calipso_cfad_sr_40(list(l), j, i) &
-              = cosp_out%calipso_cfad_sr(l, j, i)
-            end do
+      end do
+    else
+      do i=1, cosp_nlr
+        do j=1, n_backscatter_bins
+          do l=1, npoints
+            cosp_diag%cosp_calipso_cfad_sr_40(list(l), j, i) &
+            = cosp_out%calipso_cfad_sr(l, j, i)
           end do
         end do
-      end if
+      end do
     end if
 
-    ! COSP: MASK FOR CALIPSO CF 40 LVLS
-    if (associated(cosp_diag%cosp_calipso_cf_40_mask)) then
-      ! create_mask needs to be called for all cases to set r_undef to zero
-      if (associated(cosp_diag%cosp_calipso_cf_40_ice)) then
-        if (l_last) then
-          do i=1, cosp_nlr
-            do l=1, npoints
-              call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 1), &
-              cosp_diag%cosp_calipso_cf_40_mask(i, list(l)))
-            end do
-          end do
-        else
-          do i=1, cosp_nlr
-            do l=1, npoints
-              call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 1), &
-              cosp_diag%cosp_calipso_cf_40_mask(list(l), i))
-            end do
-          end do
-        end if
-      end if
-      
-      if (associated(cosp_diag%cosp_calipso_cf_40_undet)) then
-        if (l_last) then
-          do i=1, cosp_nlr
-            do l=1, npoints
-              call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 3), &
-              cosp_diag%cosp_calipso_cf_40_mask(i, list(l)))
-            end do
-          end do
-        else
-          do i=1, cosp_nlr
-            do l=1, npoints
-              call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 3), &
-              cosp_diag%cosp_calipso_cf_40_mask(list(l), i))
-            end do
-          end do
-        end if
-      end if
-    
-      ! The liquid phase will always be calculated if the mask is requested
+  end if ! 2370
+
+  ! COSP: MASK FOR CALIPSO CF 40 LVLS
+  if (associated(cosp_diag%cosp_calipso_cf_40_mask)) then
+    ! create_mask needs to be called for all cases to set r_undef to zero
+
+    if (associated(cosp_diag%cosp_calipso_cf_40_ice)) then
       if (l_last) then
         do i=1, cosp_nlr
           do l=1, npoints
-            call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 2), &
+            call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 1), &
             cosp_diag%cosp_calipso_cf_40_mask(i, list(l)))
           end do
         end do
       else
         do i=1, cosp_nlr
           do l=1, npoints
-            call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 2), &
+            call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 1), &
             cosp_diag%cosp_calipso_cf_40_mask(list(l), i))
           end do
         end do
       end if
     end if
-
-    ! COSP: CALIPSO CF 40 LVLS (LIQ) (was 2473)
-    if (associated(cosp_diag%cosp_calipso_cf_40_liq)) then
-      if (l_last) then
-        do i=1, cosp_nlr
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cf_40_liq(i, list(l)) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 2)
-          end do
-        end do
-      else
-        do i=1, cosp_nlr
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cf_40_liq(list(l), i) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 2)
-          end do
-        end do
-      end if
-    end if
-
-    ! COSP: CALIPSO CF 40 LVLS (ICE) (was 2474)
-    if (associated(cosp_diag%cosp_calipso_cf_40_ice)) then
-      if (l_last) then
-        do i=1, cosp_nlr
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cf_40_ice(i, list(l)) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 1)
-          end do
-        end do
-      else
-        do i=1, cosp_nlr
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cf_40_ice(list(l), i) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 1)
-          end do
-        end do
-      end if
-    end if
-
-    ! COSP: CALIPSO CF 40 LVLS (UNDET) (was 2475)
+      
     if (associated(cosp_diag%cosp_calipso_cf_40_undet)) then
       if (l_last) then
         do i=1, cosp_nlr
           do l=1, npoints
-            cosp_diag%cosp_calipso_cf_40_undet(i, list(l)) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 3)
+            call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 3), &
+            cosp_diag%cosp_calipso_cf_40_mask(i, list(l)))
           end do
         end do
       else
         do i=1, cosp_nlr
           do l=1, npoints
-            cosp_diag%cosp_calipso_cf_40_undet(list(l), i) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 3)
+            call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 3), &
+            cosp_diag%cosp_calipso_cf_40_mask(list(l), i))
           end do
         end do
       end if
     end if
+    
+    ! The liquid phase will always be calculated if the mask is requested
+    if (l_last) then
+      do i=1, cosp_nlr
+        do l=1, npoints
+          call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 2), &
+          cosp_diag%cosp_calipso_cf_40_mask(i, list(l)))
+        end do
+      end do
+    else
+      do i=1, cosp_nlr
+        do l=1, npoints
+          call create_mask(r_undef, cosp_out%calipso_lidarcldphase(l, i, 2), &
+          cosp_diag%cosp_calipso_cf_40_mask(list(l), i))
+        end do
+      end do
+    end if
 
-  end if ! diagnostics on standard 40 vertical levels
+  end if
 
+  ! COSP: CALIPSO CF 40 LVLS (LIQ) (was 2473)
+  if (associated(cosp_diag%cosp_calipso_cf_40_liq)) then
+
+    if (l_last) then
+      do i=1, cosp_nlr
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cf_40_liq(i, list(l)) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 2)
+        end do
+      end do
+    else
+      do i=1, cosp_nlr
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cf_40_liq(list(l), i) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 2)
+        end do
+      end do
+    end if
+
+  end if ! 2473
+
+  ! COSP: CALIPSO CF 40 LVLS (ICE) (was 2474)
+  if (associated(cosp_diag%cosp_calipso_cf_40_ice)) then
+
+    if (l_last) then
+      do i=1, cosp_nlr
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cf_40_ice(i, list(l)) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 1)
+        end do
+      end do
+    else
+      do i=1, cosp_nlr
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cf_40_ice(list(l), i) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 1)
+        end do
+      end do
+    end if
+
+  end if ! 2474
+
+  ! COSP: CALIPSO CF 40 LVLS (UNDET) (was 2475)
+  if (associated(cosp_diag%cosp_calipso_cf_40_undet)) then
+
+    if (l_last) then
+      do i=1, cosp_nlr
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cf_40_undet(i, list(l)) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 3)
+        end do
+      end do
+    else
+      do i=1, cosp_nlr
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cf_40_undet(list(l), i) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcldphase(l, i, 3)
+        end do
+      end do
+    end if
+
+  end if ! 2475
 
   ! COSP: ISCCP WEIGHTED CLOUD ALBEDO (was 2331)
   if (associated(cosp_diag%cosp_weighted_cloud_albedo)) then
+
     do l=1, npoints
       cosp_diag%cosp_weighted_cloud_albedo(list(l)) &
-        = 0.01_RealExt * cosp_out%isccp_totalcldarea(l) &
-                       * cosp_out%isccp_meanalbedocld(l)
+      = 0.01_RealExt * cosp_out%isccp_totalcldarea(l) &
+                     * cosp_out%isccp_meanalbedocld(l)
     end do
-  end if
+
+  end if ! 2331
 
   ! COSP: ISCCP WEIGHTED CLOUD TOP PRESSURE (was 2333)
   if (associated(cosp_diag%cosp_weighted_ctp)) then
+
     do l=1, npoints
       cosp_diag%cosp_weighted_ctp(list(l)) &
-        = 0.01_RealExt * cosp_out%isccp_totalcldarea(l) &
-                       * cosp_out%isccp_meanptop(l)
+      = 0.01_RealExt * cosp_out%isccp_totalcldarea(l) &
+                     * cosp_out%isccp_meanptop(l)
     end do
-  end if
+
+  end if ! 2333
 
   ! COSP: ISCCP TOTAL CLOUD AREA (was 2334)
   if (associated(cosp_diag%cosp_tot_cloud_area)) then
+
     do l=1, npoints
       cosp_diag%cosp_tot_cloud_area(list(l)) &
-        = 0.01_RealExt * cosp_out%isccp_totalcldarea(l)
+      = 0.01_RealExt * cosp_out%isccp_totalcldarea(l)
     end do
+
+  end if ! 2334
+
+  ! COSP: CALIPSO MOLECULAR ATB MDL LVLS (was 2340)
+  if (associated(cosp_diag%cosp_calipso_mol_atb_mdl)) then
+
+    if (l_last) then
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_calipso_mol_atb_mdl(i, list(l)) &
+          = cosp_out%calipso_beta_mol(l, i)
+        end do
+      end do
+    else
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_calipso_mol_atb_mdl(list(l), i) &
+          = cosp_out%calipso_beta_mol(l, i)
+        end do
+      end do
+    end if
+
+  end if ! 2340
+
+  ! COSP: GBX-MEAN CSAT Ze MDL LEVELS (2353)
+  if (associated(cosp_diag%cosp_cloudsat_gbxmean_ze_mdl)) then
+
+    call cosp_gridbox_mean(npoints, ncolumns, nlevels, &
+      cosp_column_in%surfelev, &
+      cosp_column_in%hgt_matrix(:,nlevels:1:-1), &
+      .false., &
+      cosp_out%cloudsat_ze_tot, cloudsat_gbxmean_ze_mdl, &
+      log_units=.true., sensitivity=0.001)
+
+    if (l_last) then
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_cloudsat_gbxmean_ze_mdl(i, list(l)) &
+          = cloudsat_gbxmean_ze_mdl(l, i)
+        end do
+      end do
+    else
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_cloudsat_gbxmean_ze_mdl(list(l), i) &
+          = cloudsat_gbxmean_ze_mdl(l, i)
+        end do
+      end do
+    end if
+
+  end if ! 2353
+
+  ! Required for 2354
+  if (associated(cosp_diag%cosp_cloudsat_gbxmean_ze_40)) then
+
+    call cosp_change_vertical_grid(npoints, ncolumns, nlevels, &
+      cosp_column_in%hgt_matrix(:,nlevels:1:-1), &
+      cosp_column_in%hgt_matrix_half(:,nlevels:1:-1), &
+      cosp_out%cloudsat_ze_tot, &
+      cosp_nlr, &
+      vgrid_zl(cosp_nlr:1:-1), vgrid_zu(cosp_nlr:1:-1), &
+      cloudsat_ze_tot_40(:,:,cosp_nlr:1:-1))
+
   end if
-
-
-  call cosp_change_vertical_grid(npoints,ncolumns,nlevels, &
-           cosp_column_in%hgt_matrix,cosp_column_in%hgt_matrix_half, &
-           cosp_out%cloudsat_ze_tot,cosp_nlr,vgrid_zl,vgrid_zu, &
-           cloudsat_ze_tot_40)
            
-  call cosp_gridbox_mean(npoints,ncolumns,nlevels, &
-           cosp_column_in%hgt_matrix,cosp_column_in%hgt_matrix_half, &
-           .true., cloudsat_ze_tot_40, cloudsat_gbxmean_ze_40)
-
   ! COSP: GBX-MEAN CSAT Ze 40 LEVELS (was 2354)
   if (associated(cosp_diag%cosp_cloudsat_gbxmean_ze_40)) then
+
+    call cosp_gridbox_mean(npoints, ncolumns, cosp_nlr, &
+      cosp_column_in%surfelev, &
+      vgrid_zu(cosp_nlr:1:-1), &
+      .true., &
+      cloudsat_ze_tot_40(:,:,cosp_nlr:1:-1), &
+      cloudsat_gbxmean_ze_40(:,cosp_nlr:1:-1), &
+      log_units=.true., sensitivity=0.001)
+
     if (l_last) then
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_cloudsat_gbxmean_ze_40(ii, list(l)) &
-            = cloudsat_gbxmean_ze_40(l, i)
+        do l=1, npoints
+          cosp_diag%cosp_cloudsat_gbxmean_ze_40(i, list(l)) &
+          = cloudsat_gbxmean_ze_40(l, i)
           end do
       end do
     else
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_cloudsat_gbxmean_ze_40(list(l), ii) &
-            = cloudsat_gbxmean_ze_40(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_cloudsat_gbxmean_ze_40(list(l), i) &
+          = cloudsat_gbxmean_ze_40(l, i)
+        end do
       end do
     end if
+
+  end if ! 2354
+
+  ! COSP: GBX-MEAN CALIPSO ATB MDL LEVELS (2355)
+  if (associated(cosp_diag%cosp_calipso_gbxmean_atb_mdl)) then
+
+    call cosp_gridbox_mean(npoints, ncolumns, nlevels, &
+      cosp_column_in%hgt_matrix_half, cosp_column_in%surfelev, &
+      .false., &
+      cosp_out%calipso_beta_tot, calipso_gbxmean_atb_mdl)
+
+    if (l_last) then
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_calipso_gbxmean_atb_mdl(i, list(l)) &
+          = calipso_gbxmean_atb_mdl(l, i)
+        end do
+      end do
+    else
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_calipso_gbxmean_atb_mdl(list(l), i) &
+          = calipso_gbxmean_atb_mdl(l, i)
+        end do
+      end do
+    end if
+
+  end if ! 2355
+ 
+  ! Required for 2356
+  if (associated(cosp_diag%cosp_calipso_gbxmean_atb_40)) then
+ 
+    call cosp_change_vertical_grid(npoints,ncolumns,nlevels, &
+      cosp_column_in%hgt_matrix(:,nlevels:1:-1), &
+      cosp_column_in%hgt_matrix_half(:,nlevels:1:-1), &
+      cosp_out%calipso_beta_tot, &
+      cosp_nlr, &
+      vgrid_zl(cosp_nlr:1:-1), vgrid_zu(cosp_nlr:1:-1), &
+      calipso_beta_tot_40(:,:,cosp_nlr:1:-1))
+ 
   end if
  
-  call cosp_change_vertical_grid(npoints,ncolumns,nlevels, &
-           cosp_column_in%hgt_matrix,cosp_column_in%hgt_matrix_half, &
-           cosp_out%calipso_beta_tot,cosp_nlr,vgrid_zl,vgrid_zu, &
-           calipso_beta_tot_40)
-           
-  call cosp_gridbox_mean(npoints,ncolumns,nlevels, &
-           cosp_column_in%hgt_matrix,cosp_column_in%hgt_matrix_half, &
-           .true., calipso_beta_tot_40, calipso_gbxmean_atb_40)
-
   ! COSP: GBX-MEAN CALIPSO ATB 40 LEVELS (was 2356)
-  if (associated(cosp_diag%cosp_calipso_gbxmean_atb_40)) then
+  if (associated(cosp_diag%cosp_calipso_gbxmean_atb_40)) then 
+
+    call cosp_gridbox_mean(npoints,ncolumns,nlevels, &
+      cosp_column_in%hgt_matrix(:,nlevels:1:-1), &
+      cosp_column_in%hgt_matrix_half(:,nlevels:1:-1), & 
+      .true., calipso_beta_tot_40(:,:,cosp_nlr:1:-1), &
+      calipso_gbxmean_atb_40(:,cosp_nlr:1:-1))
+
     if (l_last) then
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_gbxmean_atb_40(ii, list(l)) &
-            = calipso_gbxmean_atb_40(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_gbxmean_atb_40(i, list(l)) &
+          = calipso_gbxmean_atb_40(l, i)
+        end do
       end do
     else
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_gbxmean_atb_40(list(l), ii) &
-            = calipso_gbxmean_atb_40(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_gbxmean_atb_40(list(l), i) &
+          = calipso_gbxmean_atb_40(l, i)
+        end do
       end do
     end if
-  end if
 
-  call cosp_change_vertical_grid(npoints,1,nlevels, &
-           cosp_column_in%hgt_matrix,cosp_column_in%hgt_matrix_half, &
-           cosp_out%calipso_beta_mol,cosp_nlr,vgrid_zl,vgrid_zu, &
-           calipso_beta_mol_40)
+  end if ! 2356
+
+  ! Required for 2357, 2327 and 2359
+  if (associated(cosp_diag%cosp_calipso_mol_atb_40) .or. &
+      (associated(cosp_diag%cosp_calipso_cloudsat_40_cl_mask) .or. &
+       associated(cosp_diag%cosp_calipso_cloudsat_40_cl))) then      
+
+    call cosp_change_vertical_grid(npoints,1,nlevels, &
+      cosp_column_in%hgt_matrix(:,nlevels:1:-1), &
+      cosp_column_in%hgt_matrix_half(:,nlevels:1:-1), &
+      cosp_out%calipso_beta_mol, &
+      cosp_nlr, &
+      vgrid_zl(cosp_nlr:1:-1),vgrid_zu(cosp_nlr:1:-1), &
+      calipso_beta_mol_40(:,cosp_nlr:1:-1))
+
+  endif
 
   ! COSP: CALIPSO MOLECULAR ATB 40 LVLS (was 2357)
   if (associated(cosp_diag%cosp_calipso_mol_atb_40)) then
+
     if (l_last) then
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_mol_atb_40(ii, list(l)) &
-            = calipso_beta_mol_40(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_mol_atb_40(i, list(l)) &
+          = calipso_beta_mol_40(l, i)
+        end do
       end do
     else
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_mol_atb_40(list(l), ii) &
-            = calipso_beta_mol_40(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_mol_atb_40(list(l), i) &
+          = calipso_beta_mol_40(l, i)
+        end do
       end do
     end if
+
+  end if ! 2357
+
+  ! Required for 2326 and 2358
+  if (associated(cosp_diag%cosp_calipso_cloudsat_mdl_cl_mask) .or. &
+      associated(cosp_diag%cosp_calipso_cloudsat_mdl_cl)) then
+
+    call cosp_radar_and_lidar_cloud_fraction( &
+      npoints, ncolumns, nlevels, &
+      cosp_out%calipso_beta_mol, cosp_out%calipso_beta_tot, &
+      cosp_out%cloudsat_ze_tot, calipso_cloudsat_mdl_cl)
+
   end if
 
-  call cosp_radar_and_lidar_cloud_fraction(npoints,ncolumns,cosp_nlr, &
-         calipso_beta_mol_40,calipso_beta_tot_40,cloudsat_ze_tot_40, &
-         calipso_cloudsat_40_cl)
+  ! COSP: MASK FOR CALIPSO/CLOUDSAT CLOUD 40 LEVELS (2358) (was 2326)
+  if (associated(cosp_diag%cosp_calipso_cloudsat_mdl_cl_mask)) then
+
+    if (l_last) then
+      do i=1, nlevels
+        do l=1, npoints
+          call create_mask(r_undef, calipso_cloudsat_mdl_cl(l, i), &
+          cosp_diag%cosp_calipso_cloudsat_mdl_cl_mask(i, list(l)))
+        end do
+      end do
+    else
+      do i=1, nlevels
+        do l=1, npoints
+          call create_mask(r_undef, calipso_cloudsat_mdl_cl(l, i), &
+          cosp_diag%cosp_calipso_cloudsat_mdl_cl_mask(list(l), i))
+        end do
+      end do
+    end if
+
+  end if ! 2326
+
+  ! COSP: CALIPSO/CLOUDSAT CLOUD MDL LEV (was 2358)
+  if (associated(cosp_diag%cosp_calipso_cloudsat_mdl_cl)) then
+
+    if (l_last) then
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cloudsat_mdl_cl(i, list(l)) &
+          = calipso_cloudsat_mdl_cl(l, i)
+        end do
+      end do
+    else
+      do i=1, nlevels
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cloudsat_mdl_cl(list(l), i) &
+          = calipso_cloudsat_mdl_cl(l, i)
+        end do
+      end do
+    end if
+
+  end if ! 2358
+
+  ! Required for 2327 and 2359
+  if (associated(cosp_diag%cosp_calipso_cloudsat_40_cl_mask) .or. &
+      associated(cosp_diag%cosp_calipso_cloudsat_40_cl)) then
+
+    call cosp_radar_and_lidar_cloud_fraction( &
+      npoints, ncolumns, cosp_nlr, &
+      calipso_beta_mol_40,calipso_beta_tot_40, &
+      cloudsat_ze_tot_40, calipso_cloudsat_40_cl)
+
+  end if
 
   ! COSP: MASK FOR CALIPSO/CLOUDSAT CLOUD 40 LEVELS (2359) (was 2327)
   if (associated(cosp_diag%cosp_calipso_cloudsat_40_cl_mask)) then
+
     if (l_last) then
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            call create_mask(r_undef, calipso_cloudsat_40_cl(l, i), &
-            cosp_diag%cosp_calipso_cloudsat_40_cl_mask(ii, list(l)))
-          end do
+        do l=1, npoints
+          call create_mask(r_undef, calipso_cloudsat_40_cl(l, i), &
+          cosp_diag%cosp_calipso_cloudsat_40_cl_mask(i, list(l)))
+        end do
       end do
     else
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            call create_mask(r_undef, calipso_cloudsat_40_cl(l, i), &
-            cosp_diag%cosp_calipso_cloudsat_40_cl_mask(list(l), ii))
-          end do
+        do l=1, npoints
+          call create_mask(r_undef, calipso_cloudsat_40_cl(l, i), &
+          cosp_diag%cosp_calipso_cloudsat_40_cl_mask(list(l), i))
+        end do
       end do
     end if
-  end if
+
+  end if ! 2327
 
   ! COSP: CALIPSO/CLOUDSAT CLOUD 40 LEV (was 2359)
   if (associated(cosp_diag%cosp_calipso_cloudsat_40_cl)) then
+
     if (l_last) then
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cloudsat_40_cl(ii, list(l)) &
-            = 0.01_RealExt * calipso_cloudsat_40_cl(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cloudsat_40_cl(i, list(l)) &
+          = calipso_cloudsat_40_cl(l, i)
+        end do
       end do
     else
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cloudsat_40_cl(list(l), ii) &
-            = 0.01_RealExt * calipso_cloudsat_40_cl(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cloudsat_40_cl(list(l), i) &
+          = calipso_cloudsat_40_cl(l, i)
+        end do
       end do
     end if
-  end if
+
+  end if ! 2359
 
   ! COSP: CALIPSO CLOUD AREA 40 CSAT LEVELS (was 2371)
   if (associated(cosp_diag%cosp_calipso_cloud_area_40)) then
+
     if (l_last) then
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cloud_area_40(ii, list(l)) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcld(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cloud_area_40(i, list(l)) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcld(l, i)
+        end do
       end do
     else
       do i=1, cosp_nlr
-        ii=cosp_nlr-i+1
-          do l=1, npoints
-            cosp_diag%cosp_calipso_cloud_area_40(list(l), ii) &
-            = 0.01_RealExt * cosp_out%calipso_lidarcld(l, i)
-          end do
+        do l=1, npoints
+          cosp_diag%cosp_calipso_cloud_area_40(list(l), i) &
+          = 0.01_RealExt * cosp_out%calipso_lidarcld(l, i)
+        end do
       end do
     end if
-  end if
+
+  end if ! 2371 
 
   ! COSP: CLOUDSAT CFAD Ze 40 CSAT LVLS (was 2372)
   if (associated(cosp_diag%cosp_cloudsat_cfad_ze_40)) then
+
     if (l_last) then
       do i=1, cosp_nlr
         do j=1, n_backscatter_bins
@@ -1197,7 +1404,8 @@ subroutine cosp( nlevels, &
         end do
       end do
     end if
-  end if
+
+  end if ! 2372
 
 
   if (.not.present(cosp_out_ext)) then

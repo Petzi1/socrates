@@ -65,6 +65,7 @@ INTEGER :: i,j,k,npoints,nlevels,ni,nj
 REAL, ALLOCATABLE :: aux2d(:,:)
 REAL, ALLOCATABLE :: rho(:,:)
 REAL, PARAMETER :: r_spec = 287.052874
+REAL, PARAMETER :: repsilon = 0.62198
 LOGICAL, PARAMETER :: no_precip_flux = .FALSE.
 CHARACTER(LEN=errormessagelength) :: cmessage = ' '
 ! Routine name and DrHook variables
@@ -80,7 +81,10 @@ nlevels = cosp_hmodel%nlevels
 
 ! Calculation of effective radius. aux2d is the layer density
 ALLOCATE(aux2d(npoints, nlevels), rho(npoints, nlevels))
-rho = cosp_column_in%pfull / (r_spec*cosp_column_in%at)
+rho = cosp_column_in%pfull / (r_spec*cosp_column_in%at*(1.0 +                  &
+  ((1.0 - repsilon)/repsilon)*cosp_column_in%qv -                              &
+  cosp_hmodel%mr_gbx(:,:,i_lscliq) - cosp_hmodel%mr_gbx(:,:,i_lscice) -        &
+  cosp_hmodel%mr_gbx(:,:,i_cvcliq) - cosp_hmodel%mr_gbx(:,:,i_cvcice)))
 
 ! Convert precipitation fluxes to mixing ratios
 i_convert_flux = [ i_lsrain, i_lsiagg, i_lsgrpl, i_cvrain, i_cvsnow ]

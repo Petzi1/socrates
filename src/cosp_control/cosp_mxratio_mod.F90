@@ -8,6 +8,7 @@ MODULE cosp_mxratio_mod
 
 USE parkind1, ONLY: jpim, jprb
 USE yomhook,  ONLY: lhook, dr_hook
+USE cosp_kinds, ONLY: wp
 
 IMPLICIT NONE
 
@@ -37,16 +38,16 @@ SUBROUTINE cosp_mxratio(npoints,nlevels,p,t,n_ax,n_bx,alpha_x,c_x,d_x,g_x,     &
 IMPLICIT NONE
 ! Input arguments, (IN)
 INTEGER,INTENT(IN) :: Npoints,Nlevels
-REAL,INTENT(IN) :: p(Npoints,Nlevels),t(Npoints,Nlevels),                      &
+REAL(wp),INTENT(IN) :: p(Npoints,Nlevels),t(Npoints,Nlevels),                  &
                    flux(Npoints,Nlevels)
-REAL,INTENT(IN) :: n_ax,n_bx,alpha_x,c_x,d_x,g_x,a_x,b_x,gamma1,gamma2,        &
+REAL(wp),INTENT(IN) :: n_ax,n_bx,alpha_x,c_x,d_x,g_x,a_x,b_x,gamma1,gamma2,    &
                    gamma3,gamma4
 ! Input arguments, (OUT)
-REAL,INTENT(OUT) :: mxratio(Npoints,Nlevels)
-REAL,INTENT(IN OUT) :: reff(Npoints,Nlevels)
+REAL(wp),INTENT(OUT) :: mxratio(Npoints,Nlevels)
+REAL(wp),INTENT(IN OUT) :: reff(Npoints,Nlevels)
 ! Local variables
 INTEGER :: i,k
-REAL :: sigma,one_over_xip1,xi,rho0,rho,lambda_x,gamma_4_3_2,delta
+REAL(wp) :: sigma,one_over_xip1,xi,rho0,rho,lambda_x,gamma_4_3_2,delta
 ! Routine name and DrHook variables
 CHARACTER(LEN=*),   PARAMETER :: RoutineName='COSP_MXRATIO'
 INTEGER(KIND=jpim), PARAMETER :: zhook_in = 0

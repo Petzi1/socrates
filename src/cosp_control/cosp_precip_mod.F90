@@ -16,24 +16,25 @@ USE cosp_reff_mod, ONLY: cosp_reff
 USE errormessagelength_mod, ONLY: errormessagelength
 USE parkind1, ONLY: jpim, jprb
 USE yomhook,  ONLY: lhook, dr_hook
+USE cosp_kinds, ONLY: wp
 
 IMPLICIT NONE
 ! Exponent that controls the temperature dependence of the intercept
 ! rainfall of the PSD (0.0 -> no dependence)
-REAL, PARAMETER :: x3r = 0.0
-REAL, PARAMETER :: x3g = 0.0
+REAL(wp), PARAMETER :: x3r = 0.0_wp
+REAL(wp), PARAMETER :: x3g = 0.0_wp
 ! Exponent of the normalised density in the terminal fall speed (UMDP26)
-REAL, PARAMETER :: gx = 0.4
+REAL(wp), PARAMETER :: gx = 0.4_wp
 ! Coefficients for the density distribution of rainfall (Homogeneous liquid
 ! spheres)
-REAL, PARAMETER :: ar = 523.6
-REAL, PARAMETER :: br = 3.0
+REAL(wp), PARAMETER :: ar = 523.6_wp
+REAL(wp), PARAMETER :: br = 3.0_wp
 
-REAL, PARAMETER :: cr = 386.8
-REAL, PARAMETER :: dr = 0.67
-REAL, PARAMETER :: x1r = 2.2e-1
-REAL, PARAMETER :: x2r = 2.2
-REAL, PARAMETER :: x4r = 0.0
+REAL(wp), PARAMETER :: cr = 386.8_wp
+REAL(wp), PARAMETER :: dr = 0.67_wp
+REAL(wp), PARAMETER :: x1r = 2.2e-1_wp
+REAL(wp), PARAMETER :: x2r = 2.2_wp
+REAL(wp), PARAMETER :: x4r = 0.0_wp
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='COSP_PRECIP_MOD'
 
@@ -62,10 +63,10 @@ INTEGER, PARAMETER :: nmax_precip_flux = 5
 INTEGER :: i_convert_flux(nmax_precip_flux)
 LOGICAL :: l_convert_flux(nmax_precip_flux)
 INTEGER :: i,j,k,npoints,nlevels,ni,nj
-REAL, ALLOCATABLE :: aux2d(:,:)
-REAL, ALLOCATABLE :: rho(:,:)
-REAL, PARAMETER :: r_spec = 287.052874
-REAL, PARAMETER :: repsilon = 0.62198
+REAL(wp), ALLOCATABLE :: aux2d(:,:)
+REAL(wp), ALLOCATABLE :: rho(:,:)
+REAL(wp), PARAMETER :: r_spec = 287.052874_wp
+REAL(wp), PARAMETER :: repsilon = 0.62198_wp
 LOGICAL, PARAMETER :: no_precip_flux = .FALSE.
 CHARACTER(LEN=errormessagelength) :: cmessage = ' '
 ! Routine name and DrHook variables

@@ -2,11 +2,12 @@
 MODULE mod_cosp_stats_extra
 USE mod_cosp_config, ONLY: r_undef, r_ground
 USE cosp_input_mod, ONLY: cosp_sr_cloud
+USE cosp_kinds, ONLY: wp
 USE yomhook, ONLY: lhook, dr_hook
 USE parkind1, ONLY: jpim, jprb
 IMPLICIT NONE
 
-REAL,PARAMETER :: R_LogUnitMin = -3000.0 ! Min value for log unit conversion
+REAL(wp),PARAMETER :: R_LogUnitMin = -3000.0 ! Min value for log unit conversion
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='MOD_COSP_STATS'
 
 CONTAINS
@@ -21,20 +22,20 @@ IMPLICIT NONE
 INTEGER,INTENT(IN) :: Npoints  !# of grid points
 INTEGER,INTENT(IN) :: Nlevels  !# of grid levels
 INTEGER,INTENT(IN) :: Ncolumns !# of columns
-REAL, INTENT(IN) :: zhalf(Npoints) ! Height at bottom half level [m]
-REAL, INTENT(IN) :: zu(Nlevels)    ! Upper boundary of new levels  [m]
+REAL(wp), INTENT(IN) :: zhalf(Npoints) ! Height at bottom half level [m]
+REAL(wp), INTENT(IN) :: zu(Nlevels)    ! Upper boundary of new levels  [m]
 LOGICAL,INTENT(IN) :: lstdgrid ! Using standard grid (40 cloudsat levels)?
-REAL, INTENT(IN) :: x(Npoints,Ncolumns,Nlevels)
+REAL(wp), INTENT(IN) :: x(Npoints,Ncolumns,Nlevels)
                                         !x -  Input variable to be averaged
 LOGICAL,OPTIONAL,INTENT(IN) :: log_units ! Need to convert to linear units
-REAL,OPTIONAL,INTENT(IN) :: sensitivity ! Minimum value used
+REAL(wp),OPTIONAL,INTENT(IN) :: sensitivity ! Minimum value used
 ! Output
-REAL, INTENT(OUT) :: r(Npoints,Nlevels)
+REAL(wp), INTENT(OUT) :: r(Npoints,Nlevels)
                                         ! Variable averaged over subcolumns
 ! Local variables
 INTEGER :: i,j,k,n
 LOGICAL :: lunits
-REAL :: t,lsensitivity
+REAL(wp) :: t,lsensitivity
 CHARACTER (LEN=* ), PARAMETER :: RoutineName='COSP_GRIDBOX_MEAN'
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -102,24 +103,24 @@ IMPLICIT NONE
 INTEGER,INTENT(IN) :: Npoints  !# of grid points
 INTEGER,INTENT(IN) :: Ncolumns !# of columns
 INTEGER,INTENT(IN) :: Nlevels  !# of grid levels
-REAL,INTENT(IN) :: atb_mol(Npoints,Nlevels) ! Molecular backscatter
-REAL,INTENT(IN) :: atb_tot(Npoints,Ncolumns,Nlevels)
+REAL(wp),INTENT(IN) :: atb_mol(Npoints,Nlevels) ! Molecular backscatter
+REAL(wp),INTENT(IN) :: atb_tot(Npoints,Ncolumns,Nlevels)
                                                ! Total backscattered signal
-REAL,INTENT(IN) :: ze_tot(Npoints,Ncolumns,Nlevels)
+REAL(wp),INTENT(IN) :: ze_tot(Npoints,Ncolumns,Nlevels)
                                                ! Radar reflectivity
 ! Output arguments
-REAL,INTENT(OUT) :: cllidarradar(Npoints,Nlevels)
+REAL(wp),INTENT(OUT) :: cllidarradar(Npoints,Nlevels)
 
 ! Local variables
 LOGICAL :: radar_detect ! Radar detects cloud in volume
 LOGICAL :: lidar_detect ! Lidar detects cloud in volume
 LOGICAL :: valid_volume ! Volume with non-missing data or attenuated
-REAL :: lidar_sr ! Lidar scattering ratio
-REAL :: sr_cld ! Threshold for lidar cloud detection
-REAL,PARAMETER :: sr_att = 0.01 ! Threshold for attenuation
-REAL,PARAMETER :: ze_cld = -30.0 ! Threshold for radar cloud detection
-REAL :: Nvol ! Number of valid volumes
-REAL :: Ncloud ! Number of cloudy volumes
+REAL(wp) :: lidar_sr ! Lidar scattering ratio
+REAL(wp) :: sr_cld ! Threshold for lidar cloud detection
+REAL(wp),PARAMETER :: sr_att = 0.01 ! Threshold for attenuation
+REAL(wp),PARAMETER :: ze_cld = -30.0 ! Threshold for radar cloud detection
+REAL(wp) :: Nvol ! Number of valid volumes
+REAL(wp) :: Ncloud ! Number of cloudy volumes
 INTEGER :: ip,ic,il ! Loop indices
 CHARACTER (LEN=* ), PARAMETER :: RoutineName=                                  &
     'COSP_RADAR_AND_LIDAR_CLOUD_FRACTION'

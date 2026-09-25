@@ -1092,7 +1092,7 @@ subroutine cosp( nlevels, &
       cosp_column_in%hgt_matrix(:,nlevels:1:-1), &
       .false., &
       cosp_out%cloudsat_ze_tot, cloudsat_gbxmean_ze_mdl, &
-      log_units=.true., sensitivity=0.001)
+      log_units=.true., sensitivity=0.001_wp)
 
     if (l_last) then
       do i=1, nlevels
@@ -1134,7 +1134,7 @@ subroutine cosp( nlevels, &
       .true., &
       cloudsat_ze_tot_40(:,:,cosp_nlr:1:-1), &
       cloudsat_gbxmean_ze_40(:,cosp_nlr:1:-1), &
-      log_units=.true., sensitivity=0.001)
+      log_units=.true., sensitivity=0.001_wp)
 
     if (l_last) then
       do i=1, cosp_nlr
